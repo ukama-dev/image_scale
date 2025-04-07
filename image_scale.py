@@ -6,51 +6,151 @@ This script takes an input image and generates all the necessary icon sizes
 required for an iOS application.
 
 Usage:
-    python image_scale.py input_image.png [output_directory]
+    python image_scale.py input_image.png [output_directory] [options]
 
 If output_directory is not specified, icons will be saved to './AppIcons'
 """
 
 import os
 import sys
+import json
 import argparse
+from typing import Optional
+from dataclasses import dataclass
 from PIL import Image
 
-# Define all required iOS app icon sizes
-# Format: (size, filename_prefix, description)
-IOS_ICON_SIZES = [
-    (1024, "appstore", "App Store"),
-    (180, "iphone_60pt@3x", "iPhone App Icon @3x"),
-    (167, "ipad_83.5pt@2x", "iPad Pro App Icon"),
-    (152, "ipad_76pt@2x", "iPad, iPad mini App Icon"),
-    (120, "iphone_60pt@2x", "iPhone App Icon @2x"),
-    (120, "iphone_40pt@3x", "iPhone Spotlight @3x"),
-    (87, "iphone_29pt@3x", "iPhone Settings @3x"),
-    (80, "iphone_40pt@2x", "iPhone Spotlight @2x"),
-    (80, "ipad_40pt@2x", "iPad Spotlight @2x"),
-    (76, "ipad_76pt", "iPad App Icon @1x"),
-    (60, "iphone_60pt", "iPhone App Icon @1x"),
-    (58, "iphone_29pt@2x", "iPhone Settings @2x"),
-    (58, "ipad_29pt@2x", "iPad Settings @2x"),
-    (40, "iphone_40pt", "iPhone Spotlight @1x"),
-    (40, "ipad_40pt", "iPad Spotlight @1x"),
-    (29, "iphone_29pt", "iPhone Settings @1x"),
-    (29, "ipad_29pt", "iPad Settings @1x"),
-    (20, "iphone_20pt", "iPhone Notification @1x"),
-    (20, "ipad_20pt", "iPad Notification @1x"),
-]
 
-def resize_image(input_image_path, output_size, output_path):
+@dataclass
+class IconSpec:
+    """Specification for an app icon."""
+    size: int
+    filename: str
+    idiom: str
+    scale: str
+    role: Optional[str] = None
+    subgroup: Optional[str] = None
+
+
+class AppIconGenerator:
     """
-    Resize the input image to the specified size and save it to the output path.
-    
-    Args:
-        input_image_path (str): Path to the input image
-        output_size (int): Size of the output image (width and height)
-        output_path (str): Path to save the resized image
+    A class to generate app icons for iOS applications.
     """
-    try:
-        with Image.open(input_image_path) as img:
+
+    # Define all required iOS app icon sizes by device type
+    IPHONE_ICONS = [
+        IconSpec(60, "iphone_60pt@3x", "iphone", "3x", "primary"),
+        IconSpec(60, "iphone_60pt@2x", "iphone", "2x", "primary"),
+        IconSpec(40, "iphone_40pt@3x", "iphone", "3x", "spotlight"),
+        IconSpec(40, "iphone_40pt@2x", "iphone", "2x", "spotlight"),
+        IconSpec(29, "iphone_29pt@3x", "iphone", "3x", "settings"),
+        IconSpec(29, "iphone_29pt@2x", "iphone", "2x", "settings"),
+        IconSpec(20, "iphone_20pt@3x", "iphone", "3x", "notification"),
+        IconSpec(20, "iphone_20pt@2x", "iphone", "2x", "notification"),
+    ]
+
+    IPAD_ICONS = [
+        IconSpec(83.5, "ipad_83.5pt@2x", "ipad", "2x", "primary"),
+        IconSpec(76, "ipad_76pt@2x", "ipad", "2x", "primary"),
+        IconSpec(40, "ipad_40pt@2x", "ipad", "2x", "spotlight"),
+        IconSpec(40, "ipad_40pt", "ipad", "1x", "spotlight"),
+        IconSpec(29, "ipad_29pt@2x", "ipad", "2x", "settings"),
+        IconSpec(29, "ipad_29pt", "ipad", "1x", "settings"),
+        IconSpec(20, "ipad_20pt@2x", "ipad", "2x", "notification"),
+        IconSpec(20, "ipad_20pt", "ipad", "1x", "notification"),
+    ]
+
+    APP_STORE_ICON = [
+        IconSpec(1024, "appstore", "ios-marketing", "1x", "primary"),
+    ]
+
+    def __init__(self, input_path: str, output_dir: str, quality: str = "high"):
+        """
+        Initialize the AppIconGenerator.
+
+        Args:
+            input_path: Path to the input image
+            output_dir: Directory to save the generated icons
+            quality: Quality of the resized images ('high', 'medium', or 'low')
+        """
+        self.input_path = input_path
+        self.output_dir = output_dir
+        self.quality = quality
+        self.processed_count = 0
+        self.total_count = len(self.IPHONE_ICONS + self.IPAD_ICONS + self.APP_STORE_ICON)
+
+        # Create output directory structure
+        self.ios_dir = os.path.join(output_dir, "ios")
+        os.makedirs(self.ios_dir, exist_ok=True)
+
+        # Validate input image
+        self._validate_input_image()
+
+    def _validate_input_image(self) -> None:
+        """
+        Validate the input image exists and has sufficient resolution.
+
+        Raises:
+            FileNotFoundError: If the input file doesn't exist
+            ValueError: If the image is too small
+        """
+        if not os.path.isfile(self.input_path):
+            raise FileNotFoundError(f"Input file '{self.input_path}' does not exist.")
+
+        with Image.open(self.input_path) as img:
+            min_dimension = min(img.width, img.height)
+            if min_dimension < 1024:
+                raise ValueError(
+                    f"Input image is too small ({img.width}x{img.height}). "
+                    "Minimum recommended size is 1024x1024 pixels."
+                )
+
+    def _get_resize_method(self) -> int:
+        """
+        Get the appropriate resize method based on the quality setting.
+
+        Returns:
+            The PIL resize filter to use
+        """
+        quality_map = {
+            "high": Image.LANCZOS,
+            "medium": Image.BICUBIC,
+            "low": Image.BILINEAR
+        }
+        return quality_map.get(self.quality.lower(), Image.LANCZOS)
+
+    def _process_image(self, img: Image.Image, output_size: int, output_path: str) -> None:
+        """
+        Process and save an image at the specified size.
+
+        Args:
+            img: The source image
+            output_size: The size to resize to
+            output_path: Where to save the resized image
+        """
+        # Resize the image
+        resize_method = self._get_resize_method()
+        resized_img = img.resize((output_size, output_size), resize_method)
+
+        # Save the resized image
+        resized_img.save(output_path, "PNG", optimize=True)
+
+        # Update progress
+        self.processed_count += 1
+        progress = (self.processed_count / self.total_count) * 100
+        print(f"[{progress:.1f}%] Created: {output_path} ({output_size}x{output_size})")
+
+    def _prepare_image(self) -> Image.Image:
+        """
+        Prepare the input image for processing.
+
+        Returns:
+            A square version of the input image
+        """
+        with Image.open(self.input_path) as img:
+            # Convert to RGB if needed
+            if img.mode not in ('RGB', 'RGBA'):
+                img = img.convert('RGBA')
+
             # Check if image is square
             if img.width != img.height:
                 print(f"Warning: Input image is not square ({img.width}x{img.height}). Icons should be square.")
@@ -61,44 +161,98 @@ def resize_image(input_image_path, output_size, output_path):
                 right = left + min_dimension
                 bottom = top + min_dimension
                 img = img.crop((left, top, right, bottom))
-                
-            # Resize the image
-            resized_img = img.resize((output_size, output_size), Image.LANCZOS)
-            
-            # Save the resized image
-            resized_img.save(output_path)
-            print(f"Created: {output_path} ({output_size}x{output_size})")
-    except Exception as e:
-        print(f"Error processing {input_image_path}: {e}")
-        sys.exit(1)
+
+            return img.copy()
+
+    def _generate_contents_json(self) -> None:
+        """Generate a Contents.json file for Xcode asset catalogs."""
+        contents = {
+            "images": [],
+            "info": {
+                "version": 1,
+                "author": "xcode"
+            }
+        }
+
+        # Add all icons to the images array
+        for icon_set in [self.IPHONE_ICONS, self.IPAD_ICONS, self.APP_STORE_ICON]:
+            for icon in icon_set:
+                # Calculate actual pixel size
+                scale_factor = int(icon.scale[0]) if icon.scale[0].isdigit() else 1
+                pixel_size = int(icon.size * scale_factor)
+
+                image_info = {
+                    "size": f"{icon.size}x{icon.size}",
+                    "idiom": icon.idiom,
+                    "filename": f"{icon.filename}_{pixel_size}x{pixel_size}.png",
+                    "scale": icon.scale
+                }
+
+                if icon.role:
+                    image_info["role"] = icon.role
+
+                if icon.subgroup:
+                    image_info["subgroup"] = icon.subgroup
+
+                contents["images"].append(image_info)
+
+        # Write the Contents.json file
+        contents_path = os.path.join(self.ios_dir, "Contents.json")
+        with open(contents_path, 'w') as f:
+            json.dump(contents, f, indent=2)
+
+        print(f"Created: {contents_path}")
+
+    def generate_icons(self) -> None:
+        """Generate all required app icons."""
+        try:
+            # Prepare the image
+            img = self._prepare_image()
+
+            # Process all icon sizes
+            for icon_set in [self.IPHONE_ICONS, self.IPAD_ICONS, self.APP_STORE_ICON]:
+                for icon in icon_set:
+                    # Calculate actual pixel size
+                    scale_factor = int(icon.scale[0]) if icon.scale[0].isdigit() else 1
+                    pixel_size = int(icon.size * scale_factor)
+
+                    # Generate output path
+                    output_filename = f"{icon.filename}_{pixel_size}x{pixel_size}.png"
+                    output_path = os.path.join(self.ios_dir, output_filename)
+
+                    # Process the image
+                    self._process_image(img, pixel_size, output_path)
+
+            # Generate Contents.json for Xcode
+            self._generate_contents_json()
+
+            print(f"\nAll iOS app icons have been generated in: {os.path.abspath(self.output_dir)}")
+            print("You can now use these icons in your iOS app project.")
+
+        except Exception as e:
+            print(f"Error generating icons: {e}")
+            sys.exit(1)
+
 
 def main():
+    """Main entry point for the script."""
     parser = argparse.ArgumentParser(description='Generate iOS app icons from an input image.')
     parser.add_argument('input_image', help='Path to the input image (preferably 1024x1024 PNG)')
-    parser.add_argument('output_dir', nargs='?', default='AppIcons', 
+    parser.add_argument('output_dir', nargs='?', default='AppIcons',
                         help='Directory to save the generated icons (default: AppIcons)')
-    
+    parser.add_argument('--quality', choices=['high', 'medium', 'low'], default='high',
+                        help='Quality of the resized images (default: high)')
+
     args = parser.parse_args()
-    
-    # Check if input file exists
-    if not os.path.isfile(args.input_image):
-        print(f"Error: Input file '{args.input_image}' does not exist.")
+
+    try:
+        # Create the generator and generate icons
+        generator = AppIconGenerator(args.input_image, args.output_dir, args.quality)
+        generator.generate_icons()
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Error: {e}")
         sys.exit(1)
-    
-    # Create output directory if it doesn't exist
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
-        print(f"Created output directory: {args.output_dir}")
-    
-    # Process each icon size
-    for size, prefix, description in IOS_ICON_SIZES:
-        output_filename = f"{prefix}_{size}x{size}.png"
-        output_path = os.path.join(args.output_dir, output_filename)
-        
-        resize_image(args.input_image, size, output_path)
-    
-    print(f"\nAll iOS app icons have been generated in: {os.path.abspath(args.output_dir)}")
-    print("You can now use these icons in your iOS app project.")
+
 
 if __name__ == "__main__":
     main()

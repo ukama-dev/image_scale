@@ -1,6 +1,16 @@
 # iOS App Icon Generator
 
-A simple Python script to generate all the necessary icon sizes required for an iOS application.
+A Python script that generates all the necessary icon sizes required for iOS applications, organized by device type and with proper naming conventions for Xcode.
+
+## Features
+
+- Generates all required iOS app icon sizes for iPhone and iPad
+- Creates a proper directory structure for easy import into Xcode
+- Generates a Contents.json file for Xcode asset catalogs
+- Supports different quality levels for image resizing
+- Validates input images for proper size and format
+- Shows progress during generation
+- Handles non-square images by automatically cropping
 
 ## Requirements
 
@@ -19,7 +29,7 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-python image_scale.py input_image.png [output_directory]
+python image_scale.py input_image.png [output_directory] [options]
 ```
 
 ### Arguments
@@ -27,36 +37,67 @@ python image_scale.py input_image.png [output_directory]
 - `input_image.png`: Path to the input image (preferably a 1024x1024 PNG)
 - `output_directory` (optional): Directory to save the generated icons (default: `./AppIcons`)
 
+### Options
+
+- `--quality {high,medium,low}`: Quality of the resized images (default: high)
+
 ### Example
 
 ```bash
-python image_scale.py my_icon.png MyAppIcons
+python image_scale.py my_icon.png MyAppIcons --quality high
 ```
 
-This will generate all the required iOS app icon sizes in the `MyAppIcons` directory.
+This will generate all the required iOS app icon sizes in the `MyAppIcons/ios` directory along with a Contents.json file for Xcode.
 
 ## Generated Icon Sizes
 
 The script generates the following iOS app icon sizes:
 
-| Size (pixels) | Description |
-|---------------|-------------|
-| 1024x1024 | App Store |
-| 180x180 | iPhone App Icon @3x |
-| 167x167 | iPad Pro App Icon |
-| 152x152 | iPad, iPad mini App Icon |
-| 120x120 | iPhone App Icon @2x / iPhone Spotlight @3x |
-| 87x87 | iPhone Settings @3x |
-| 80x80 | iPhone/iPad Spotlight @2x |
-| 76x76 | iPad App Icon @1x |
-| 60x60 | iPhone App Icon @1x |
-| 58x58 | iPhone/iPad Settings @2x |
-| 40x40 | iPhone/iPad Spotlight @1x |
-| 29x29 | iPhone/iPad Settings @1x |
-| 20x20 | iPhone/iPad Notification @1x |
+### iPhone Icons
+
+| Size (points) | Scale | Actual Size (pixels) | Usage |
+|--------------|-------|----------------------|-------|
+| 60x60 | @3x | 180x180 | App Icon |
+| 60x60 | @2x | 120x120 | App Icon |
+| 40x40 | @3x | 120x120 | Spotlight |
+| 40x40 | @2x | 80x80 | Spotlight |
+| 29x29 | @3x | 87x87 | Settings |
+| 29x29 | @2x | 58x58 | Settings |
+| 20x20 | @3x | 60x60 | Notification |
+| 20x20 | @2x | 40x40 | Notification |
+
+### iPad Icons
+
+| Size (points) | Scale | Actual Size (pixels) | Usage |
+|--------------|-------|----------------------|-------|
+| 83.5x83.5 | @2x | 167x167 | App Icon (iPad Pro) |
+| 76x76 | @2x | 152x152 | App Icon |
+| 40x40 | @2x | 80x80 | Spotlight |
+| 40x40 | @1x | 40x40 | Spotlight |
+| 29x29 | @2x | 58x58 | Settings |
+| 29x29 | @1x | 29x29 | Settings |
+| 20x20 | @2x | 40x40 | Notification |
+| 20x20 | @1x | 20x20 | Notification |
+
+### App Store
+
+| Size (points) | Scale | Actual Size (pixels) | Usage |
+|--------------|-------|----------------------|-------|
+| 1024x1024 | @1x | 1024x1024 | App Store |
+
+## Xcode Integration
+
+The script generates a Contents.json file that allows you to easily import the icons into Xcode:
+
+1. Generate the icons using this script
+2. In Xcode, open your project's asset catalog
+3. Right-click and select "New App Icon"
+4. Delete the default AppIcon set
+5. Copy the contents of the generated `ios` directory into your AppIcon.appiconset directory
 
 ## Notes
 
-- The input image should ideally be square and at least 1024x1024 pixels
-- If the input image is not square, it will be cropped from the center
-- All generated icons are in PNG format
+- The input image should be square and at least 1024x1024 pixels
+- If the input image is not square, it will be automatically cropped from the center
+- All generated icons are optimized PNG files
+- The high-quality setting uses the Lanczos resampling algorithm for best results
