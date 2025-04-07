@@ -29,7 +29,7 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-python image_scale.py input_image.png [output_directory] [options]
+python ios_icon_generator.py input_image.png [output_directory] [options]
 ```
 
 ### Arguments
@@ -44,7 +44,7 @@ python image_scale.py input_image.png [output_directory] [options]
 ### Example
 
 ```bash
-python image_scale.py my_icon.png MyAppIcons --quality high
+python ios_icon_generator.py my_icon.png MyAppIcons --quality high
 ```
 
 This will generate all the required iOS app icon sizes in the `MyAppIcons/ios` directory along with a Contents.json file for Xcode.
