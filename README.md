@@ -103,3 +103,7 @@ The script generates a Contents.json file that allows you to easily import the i
 - All generated icons are optimized PNG files
 - The high-quality setting uses the Lanczos resampling algorithm for best results
 - Upscaling always uses the Lanczos algorithm regardless of quality setting
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

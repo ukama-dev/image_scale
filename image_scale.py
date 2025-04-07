@@ -9,6 +9,10 @@ Usage:
     python image_scale.py input_image.png [output_directory] [options]
 
 If output_directory is not specified, icons will be saved to './AppIcons'
+
+License:
+    MIT License
+    See the LICENSE file for details.
 """
 
 import os
