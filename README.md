@@ -97,7 +97,9 @@ The script generates a Contents.json file that allows you to easily import the i
 
 ## Notes
 
-- The input image should be square and at least 1024x1024 pixels
+- The input image should be square and at least 512x512 pixels (1024x1024 recommended)
+- Images between 512x512 and 1024x1024 will be automatically upscaled
 - If the input image is not square, it will be automatically cropped from the center
 - All generated icons are optimized PNG files
 - The high-quality setting uses the Lanczos resampling algorithm for best results
+- Upscaling always uses the Lanczos algorithm regardless of quality setting

@@ -77,6 +77,7 @@ class AppIconGenerator:
         self.quality = quality
         self.processed_count = 0
         self.total_count = len(self.IPHONE_ICONS + self.IPAD_ICONS + self.APP_STORE_ICON)
+        self.needs_upscaling = False
 
         # Create output directory structure
         self.ios_dir = os.path.join(output_dir, "ios")
@@ -98,11 +99,17 @@ class AppIconGenerator:
 
         with Image.open(self.input_path) as img:
             min_dimension = min(img.width, img.height)
-            if min_dimension < 1024:
+            if min_dimension < 512:
                 raise ValueError(
                     f"Input image is too small ({img.width}x{img.height}). "
-                    "Minimum recommended size is 1024x1024 pixels."
+                    "Minimum size is 512x512 pixels."
                 )
+            elif min_dimension < 1024:
+                print(f"Warning: Input image ({img.width}x{img.height}) is smaller than the recommended 1024x1024 pixels.")
+                print("The image will be upscaled to generate the required icon sizes.")
+                self.needs_upscaling = True
+            else:
+                self.needs_upscaling = False
 
     def _get_resize_method(self) -> int:
         """
@@ -139,12 +146,31 @@ class AppIconGenerator:
         progress = (self.processed_count / self.total_count) * 100
         print(f"[{progress:.1f}%] Created: {output_path} ({output_size}x{output_size})")
 
+    def _upscale_image(self, img: Image.Image, target_size: int = 1024) -> Image.Image:
+        """
+        Upscale an image to the target size using the high-quality resize method.
+
+        Args:
+            img: The source image to upscale
+            target_size: The target size (width and height) for the upscaled image
+
+        Returns:
+            The upscaled image
+        """
+        current_size = img.width  # Image is already square at this point
+        if current_size >= target_size:
+            return img
+
+        print(f"Upscaling image from {current_size}x{current_size} to {target_size}x{target_size}...")
+        # Always use LANCZOS for upscaling as it provides the best quality
+        return img.resize((target_size, target_size), Image.LANCZOS)
+
     def _prepare_image(self) -> Image.Image:
         """
         Prepare the input image for processing.
 
         Returns:
-            A square version of the input image
+            A square version of the input image, upscaled if necessary
         """
         with Image.open(self.input_path) as img:
             # Convert to RGB if needed
@@ -162,7 +188,14 @@ class AppIconGenerator:
                 bottom = top + min_dimension
                 img = img.crop((left, top, right, bottom))
 
-            return img.copy()
+            # Create a copy to work with
+            processed_img = img.copy()
+
+            # Upscale if needed
+            if self.needs_upscaling:
+                processed_img = self._upscale_image(processed_img)
+
+            return processed_img
 
     def _generate_contents_json(self) -> None:
         """Generate a Contents.json file for Xcode asset catalogs."""
