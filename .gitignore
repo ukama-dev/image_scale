@@ -1,2 +1,6 @@
 /AppIcons
 .DS_Store
+/deployment
+/portable
+/web
+*.zip
