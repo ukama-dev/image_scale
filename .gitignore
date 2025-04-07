@@ -1,6 +1,9 @@
 /AppIcons
 .DS_Store
-/deployment
-/portable
-/web
+/wheels
+/portable_package
+
 *.zip
+php_info.html
+portable_deployment.md
+README_PORTABLE.md
